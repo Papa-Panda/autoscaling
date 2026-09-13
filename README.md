@@ -3,7 +3,8 @@
 用论文搭 autoscaling 的知识图谱，对标 6 年 hyperscaler 生产经验（分钟级 nowcasting 预测式扩缩容、SLO guardrail、压测验证），双向找 gap：
 文献缺了什么（我知道的），我缺了什么（文献知道的）。
 
-> 状态：2026-09-12 初始化。知识树 + 论文清单正在由 Gemini 3.8 Flash 生成（API 波动重试中），到位后落到 `KNOWLEDGE_MAP.md`。
+> 状态：2026-09-12，`KNOWLEDGE_MAP.md` v1 已落地（四路并行 browser research，每篇论文标题·作者·venue·年份已核实）。
+> 待办：Gemini 3.8 Flash 交叉验证（API 恢复后补）→ v2。
 > 范围：先做 autoscaling（需求预测 → 扩缩容算法 → SLO 感知控制 → 压测验证）。机房热工/PUE、通用调度等以后再扩展。
 
 ## 目录结构
