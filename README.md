@@ -1,9 +1,10 @@
-# ML for Infra — 知识图谱
+# Autoscaling — 知识图谱
 
-用论文搭知识图谱，对标 6 年 hyperscaler 生产经验（预测式 autoscaling、SLO guardrail、压测验证、机房热工/PUE 建模），双向找 gap：
+用论文搭 autoscaling 的知识图谱，对标 6 年 hyperscaler 生产经验（分钟级 nowcasting 预测式扩缩容、SLO guardrail、压测验证），双向找 gap：
 文献缺了什么（我知道的），我缺了什么（文献知道的）。
 
 > 状态：2026-09-12 初始化。知识树 + 论文清单正在由 Gemini 3.8 Flash 生成（API 波动重试中），到位后落到 `KNOWLEDGE_MAP.md`。
+> 范围：先做 autoscaling（需求预测 → 扩缩容算法 → SLO 感知控制 → 压测验证）。机房热工/PUE、通用调度等以后再扩展。
 
 ## 目录结构
 
@@ -21,6 +22,6 @@
 
 ## 路线
 
-1. 知识树 + 25–30 篇论文清单（Gemini 生成，人工核验）
+1. 知识树 + 20–25 篇 autoscaling 论文清单（Gemini 生成，人工核验）
 2. 按 topic 逐篇读，做 NOTES，填对比脚手架
 3. 收敛：哪些经验值得写成 experience paper（USENIX ATC / EuroSys / SoCC 方向）
