@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Predictive Auto-scaling with OpenStack Monasca · autoscaling 阅读版</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>:root{
+  --bg:#f7f5f1; --card:#ffffff; --ink:#23272f; --muted:#6b7280;
+  --accent:#1e40af; --accent-ink:#1e3a8a; --accent-bg:#eff6ff;
+  --border:#e8e4dc; --radius:16px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif;
+  font-size:17px;line-height:1.85;-webkit-font-smoothing:antialiased}
+.progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);width:0;z-index:50}
+.wrap{max-width:800px;margin:0 auto;padding:32px 20px 80px}
+.hero{background:linear-gradient(135deg,#1e3a8a,#3b82f6);color:#fff;border-radius:20px;padding:40px 36px}
+.kicker{display:inline-block;font-size:13px;letter-spacing:.1em;background:rgba(255,255,255,.18);padding:4px 14px;border-radius:999px;margin-bottom:16px}
+.hero h1{margin:0 0 10px;font-size:27px;line-height:1.45;font-weight:700}
+.hero .sub{opacity:.92;font-size:15.5px;margin:0;line-height:1.8}
+.src-note{font-size:13.5px;color:var(--muted);margin:16px 4px 0;line-height:1.7}
+.src-note a{color:var(--accent)}
+.toc{position:sticky;top:12px;background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:12px 18px;margin:20px 0;box-shadow:0 2px 12px rgba(0,0,0,.05);z-index:10}
+.toc summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--muted);list-style:none}
+.toc summary::-webkit-details-marker{display:none}
+.toc nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.toc a{font-size:13.5px;color:var(--accent-ink);background:var(--accent-bg);padding:4px 12px;border-radius:999px;text-decoration:none}
+.sec{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:30px 34px;margin:0 0 18px;box-shadow:0 1px 6px rgba(0,0,0,.03);scroll-margin-top:80px}
+.sec h2{margin:0 0 18px;font-size:21px;display:flex;align-items:center;gap:12px;line-height:1.5}
+.sec h2 .n{display:inline-flex;width:32px;height:32px;border-radius:50%;background:var(--accent-bg);
+  color:var(--accent-ink);font-size:15px;align-items:center;justify-content:center;flex:none;font-weight:700}
+.sec h3{font-size:17.5px;margin:26px 0 10px}
+.sec p{margin:0 0 14px}
+.sec ul,.sec ol{margin:0 0 14px;padding-left:24px}
+.sec li{margin-bottom:10px}
+.sec li::marker{color:var(--accent);font-weight:600}
+.sec-lede{background:linear-gradient(180deg,#eff6ff 0%,#ffffff 100%);border-color:#bfdbfe}
+.sec-lede p{font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:14.5px;margin:6px 0 4px;line-height:1.6}
+th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:#f3f4f6;font-weight:600;white-space:nowrap}
+tr:nth-child(even) td{background:#fafafa}
+a{color:var(--accent)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f3f4f6;padding:2px 6px;border-radius:6px;font-size:.88em}
+pre{background:#1f2937;color:#e5e7eb;border-radius:12px;padding:16px 18px;overflow-x:auto}
+pre code{background:none;padding:0;color:inherit}
+.katex{font-size:1.05em}
+.katex-display{margin:18px 0;overflow-x:auto;overflow-y:hidden}
+.tag{display:inline-block;font-size:12.5px;background:#f3f4f6;border:1px solid var(--border);
+  border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:2px;margin:4px 0 10px}
+.todo{color:#92400e;background:#fffbeb;border:1px dashed #f59e0b;border-radius:10px;padding:10px 16px;font-size:15px}
+.foot{text-align:center;color:var(--muted);font-size:13.5px;margin-top:36px;line-height:2}
+.foot a{color:var(--accent)}
+@media(max-width:640px){.sec{padding:22px 20px}.hero{padding:30px 24px}.hero h1{font-size:22px}body{font-size:16px}}</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="wrap">
+  <header class="hero">
+    <span class="kicker">autoscaling · T2 · 扩缩容算法</span>
+    <h1>Predictive Auto-scaling with OpenStack Monasca</h1>
+    <p class="sub">「阈值作用在预测值上」的开源组件：RNN/MLP 预测 15 分钟后平均 CPU，连续 3 次超 80% 才扩容，提前消化 30 分钟爬坡负载。</p>
+  </header>
+  <p class="src-note">内容来源：<a href="https://github.com/Papa-Panda/autoscaling/blob/master/KNOWLEDGE_MAP.md">KNOWLEDGE_MAP.md</a>（2026-09-12 生成）——本页忠实于该条目原文，未引入条目之外的细节；条目未覆盖处标「待补充」。</p>
+  <details class="toc" open>
+    <summary>目录（点击跳转）</summary>
+    <nav><a href="#sec-1">元信息</a><a href="#sec-2">一句话总结</a><a href="#sec-3">核心贡献</a><a href="#sec-4">核心方法与公式</a><a href="#sec-5">关键数字</a><a href="#sec-6">与其它条目的关系</a><a href="#sec-7">学什么 / 没覆盖什么</a><a href="#sec-8">参考链接</a></nav>
+  </details>
+<section class="sec" id="sec-1"><h2><span class="n">1</span>元信息</h2>
+<ul>
+<li><strong>标题：</strong>Predictive Auto-scaling with OpenStack Monasca</li>
+<li><strong>作者 / 机构：</strong>Giacomo Lanciano 等（Scuola Normale Superiore）</li>
+<li><strong>发表：</strong>UCC 2021</li>
+<li><strong>所属主题：</strong>T2 · 扩缩容算法</li>
+<div class="meta"><span class="tag">autoscaling</span><span class="tag">predictive</span><span class="tag">forecast-then-threshold</span><span class="tag">openstack</span><span class="tag">monasca</span></div>
+<li><strong>知识图谱条目：</strong><a href="https://github.com/Papa-Panda/autoscaling/blob/master/KNOWLEDGE_MAP.md">KNOWLEDGE_MAP.md</a></li>
+</ul>
+</section>
+<section class="sec sec-lede" id="sec-2"><h2><span class="n">2</span>一句话总结</h2>
+<p>「阈值作用在预测值上」的开源组件：RNN/MLP 预测 15 分钟后平均 CPU，连续 3 次超 80% 才扩容，提前消化 30 分钟爬坡负载。</p>
+</section>
+<section class="sec" id="sec-3"><h2><span class="n">3</span>核心贡献</h2>
+<p><strong>「阈值作用在预测值上」</strong>的开源组件：RNN/MLP 预测 <strong>15 分钟后平均 CPU</strong>，<strong>连续 3 次超 80% 才 scale-out</strong>，提前消化 <strong>30 分钟爬坡</strong>负载。</p>
+<p>条目定位：forecast-then-threshold 是<strong>最易落地的预测式改造</strong>（不动阈值体系，只换输入信号）。</p>
+</section>
+<section class="sec" id="sec-4"><h2><span class="n">4</span>核心方法与公式</h2>
+<p>RNN/MLP 预测 15 分钟后的平均 CPU；把原有阈值体系的输入信号从「当前观测」换成「预测值」：连续 3 次预测超 80% 才触发 scale-out。</p><p class="todo">待补充——KNOWLEDGE_MAP.md 条目中未给出该论文的公式。</p>
+</section>
+<section class="sec" id="sec-5"><h2><span class="n">5</span>关键数字</h2>
+<ul>
+<li>预测 15 分钟后平均 CPU；连续 3 次超 80% 才 scale-out；提前消化 30 分钟爬坡负载；UCC 2021</li>
+</ul>
+</section>
+<section class="sec" id="sec-6"><h2><span class="n">6</span>与其它条目的关系</h2>
+<ul>
+<li><a href="../hpa-docs/index.html">K8s HPA 文档</a>：改造对象——不动阈值体系，只把输入信号换成预测值。</li>
+<li><a href="../sla-adaptive-hpa/index.html">SLA-Adaptive HPA</a>：阈值体系的另一条改造线（动态调阈值 vs 把阈值作用在预测值上）。</li>
+<li><a href="../deepar/index.html">DeepAR</a> / <a href="../tft/index.html">TFT</a>：其 RNN/MLP 预测器可被更强的概率预测模型替换。</li>
+</ul>
+</section>
+<section class="sec" id="sec-7"><h2><span class="n">7</span>学什么 / 没覆盖什么</h2>
+<h3>学什么</h3>
+<p>forecast-then-threshold 是最易落地的预测式改造：不动阈值体系，只换输入信号。</p>
+<h3>没覆盖什么生产现实</h3>
+<p>预测误差的非对称代价未形式化；无生产级灰度验证。</p>
+</section>
+<section class="sec" id="sec-8"><h2><span class="n">8</span>参考链接</h2>
+<ul>
+<li><a href="https://github.com/Papa-Panda/autoscaling/blob/master/KNOWLEDGE_MAP.md">KNOWLEDGE_MAP.md（条目原文）</a></li>
+<li>全仓库可视化：<a href="https://papa-panda.github.io/autoscaling/">papers-visualization.html</a></li>
+</ul>
+</section>
+  <div class="foot">由 <a href="https://github.com/Papa-Panda/autoscaling/blob/master/KNOWLEDGE_MAP.md">KNOWLEDGE_MAP.md</a> 条目生成 · 公式由 KaTeX 渲染（需联网加载）</div>
+</div>
+<script>document.addEventListener("DOMContentLoaded", function() {
+  renderMathInElement(document.body, {
+    delimiters: [
+      {left: "$$", right: "$$", display: true},
+      {left: "$", right: "$", display: false}
+    ],
+    throwOnError: false
+  });
+  var bar = document.getElementById("progress");
+  window.addEventListener("scroll", function() {
+    var h = document.documentElement;
+    var p = h.scrollTop / (h.scrollHeight - h.clientHeight) * 100;
+    bar.style.width = p + "%";
+  }, {passive: true});
+});</script>
+</body>
+</html>
