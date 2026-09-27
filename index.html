@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autoscaling 论文知识图谱 · 可视化</title>
+<style>
+:root{
+  --t1:#2563eb; --t2:#16a34a; --t3:#ea580c; --t4:#9333ea;
+  --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --card:#ffffff;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
+header.top{background:#111827;color:#fff;padding:28px 24px 22px}
+header.top h1{margin:0 0 6px;font-size:24px;font-weight:700}
+header.top p{margin:0;color:#9ca3af;font-size:14px}
+.stats{display:flex;gap:18px;margin-top:14px;flex-wrap:wrap}
+.stat{background:#1f2937;border:1px solid #374151;border-radius:8px;padding:8px 14px;font-size:13px}
+.stat b{color:#fff;font-size:18px;margin-right:6px}
+.searchbar{margin-top:16px;display:flex;gap:10px;max-width:640px}
+.searchbar input{flex:1;padding:10px 14px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:#fff;font-size:14px;outline:none}
+.searchbar input::placeholder{color:#6b7280}
+.searchbar button{padding:10px 18px;border-radius:8px;border:0;background:var(--t1);color:#fff;font-size:14px;cursor:pointer}
+nav.tabs{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line);display:flex;gap:4px;padding:0 16px;overflow-x:auto}
+nav.tabs a{padding:12px 16px;font-size:14px;color:var(--muted);text-decoration:none;white-space:nowrap;border-bottom:3px solid transparent}
+nav.tabs a:hover{color:var(--ink)}
+main{max-width:1280px;margin:0 auto;padding:24px 20px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:26px}
+section h2{margin:0 0 4px;font-size:19px}
+section .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+.graph-wrap{display:flex;gap:18px;flex-wrap:wrap}
+#graph{flex:1 1 640px;min-width:320px;border:1px solid var(--line);border-radius:10px;background:#fff;touch-action:none}
+#graph text{font-family:inherit}
+.node{cursor:pointer}
+.node circle{stroke:#fff;stroke-width:2}
+.node text{font-size:11px;fill:#374151;text-anchor:middle;pointer-events:none}
+.node.dim{opacity:.12}
+.node.sel circle{stroke:#111827;stroke-width:3}
+.edge{stroke:#cbd5e1;stroke-width:1.4}
+.edge.active{stroke-width:2.6}
+.edge.dim{opacity:.08}
+.edge-label{font-size:10px;fill:#4b5563;text-anchor:middle;display:none;pointer-events:none;background:#fff}
+.edge-label.on{display:block}
+.edge-label.dim{display:none}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;font-size:13px}
+.legend span{display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;border-radius:20px;border:1px solid var(--line)}
+.legend span:hover{background:#f3f4f6}
+.legend i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.chip{font-size:12px;padding:5px 12px;border-radius:16px;border:1px solid var(--line);background:#f9fafb;cursor:pointer}
+.chip.on{background:#111827;color:#fff;border-color:#111827}
+.detail{flex:0 1 330px;min-width:280px;border:1px solid var(--line);border-radius:10px;padding:18px;background:#fcfcfd;align-self:flex-start;max-height:720px;overflow:auto}
+.detail h3{margin:0 0 8px;font-size:16px}
+.detail .meta{font-size:12.5px;color:var(--muted);margin-bottom:10px}
+.detail dt{font-size:12px;color:var(--muted);margin-top:10px;font-weight:600}
+.detail dd{margin:2px 0 0;font-size:13.5px}
+.detail .rel{font-size:13px}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin:2px 4px 2px 0;color:#fff}
+.timeline{position:relative;height:230px;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
+.tl-axis{position:absolute;left:40px;right:20px;top:190px;height:2px;background:#d1d5db}
+.tl-year{position:absolute;top:196px;font-size:10px;color:var(--muted);transform:translateX(-50%)}
+.tl-dot{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;cursor:pointer;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.tl-dot.dim{opacity:.12}
+.tl-dot:hover{width:18px;height:18px}
+.tl-label{position:absolute;font-size:10px;color:#4b5563;transform:translate(-50%,0);white-space:nowrap;cursor:pointer}
+.tl-label.dim{opacity:.12}
+.cards h3{font-size:15px;margin:22px 0 10px;padding-left:10px;border-left:4px solid #ccc}
+.cards h3:first-child{margin-top:0}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff;cursor:pointer;transition:box-shadow .15s}
+.card:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.card h4{margin:0 0 4px;font-size:14px}
+.card .m{font-size:12px;color:var(--muted);margin-bottom:8px}
+.card p{font-size:13px;margin:6px 0}
+.card .nums{font-size:12.5px;color:#374151;background:#f9fafb;border-radius:6px;padding:6px 8px}
+table.cmp{width:100%;border-collapse:collapse;font-size:13px}
+table.cmp th,table.cmp td{border-bottom:1px solid var(--line);padding:9px 8px;text-align:left;vertical-align:top}
+table.cmp th{background:#f9fafb;cursor:pointer;user-select:none;white-space:nowrap;font-size:12.5px}
+table.cmp th:hover{color:var(--t1)}
+table.cmp tr:hover td{background:#f8fafc}
+.formula-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.fbox{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff}
+.fbox h4{margin:0 0 8px;font-size:14px}
+.f{font-family:Georgia,serif;background:#f9fafb;border-radius:6px;padding:8px 10px;margin:8px 0;font-size:14px}
+.f .note{display:block;font-family:inherit;font-size:11.5px;color:var(--muted);margin-top:4px}
+footer{max-width:1280px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:12.5px}
+.hint{font-size:12px;color:var(--muted)}
+kbd{background:#f3f4f6;border:1px solid #d1d5db;border-radius:4px;padding:0 5px;font-size:11px}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Autoscaling 论文知识图谱 · 可视化</h1>
+  <p>数据来源：仓库 KNOWLEDGE_MAP.md v1（2026-09-12，四路并行 browser research，已核实标题·作者·venue·年份）</p>
+  <div class="stats">
+    <div class="stat"><b>23</b>文献（22 论文 + 1 参考文档）</div>
+    <div class="stat"><b>4</b>主题</div>
+    <div class="stat"><b>2006–2024</b>时间跨度</div>
+    <div class="stat"><b id="edgeCount">–</b>条关系边</div>
+  </div>
+  <div class="searchbar">
+    <input id="q" placeholder="关键词搜索：如 OOM、报童、open-loop、混部…（过滤图谱 / 卡片 / 表格 / 时间线）">
+    <button id="qclear">清除</button>
+  </div>
+</header>
+<nav class="tabs">
+  <a href="#sec-graph">🕸 知识图谱</a>
+  <a href="#sec-timeline">📅 时间线</a>
+  <a href="#sec-cards">🗂 论文卡片</a>
+  <a href="#sec-table">📊 对比表</a>
+  <a href="#sec-formulas">∑ 核心公式</a>
+</nav>
+<main>
+<section id="sec-graph">
+  <h2>知识图谱</h2>
+  <p class="sub">节点颜色 = 主题；节点大小 = 关系度数；<b>点击节点</b>高亮其邻居并在右侧查看详情；拖拽可移动节点；点击空白处复位。</p>
+  <div class="legend" id="legend"></div>
+  <div class="chips" id="chips"></div>
+  <div class="graph-wrap">
+    <svg id="graph" viewBox="0 0 1160 660" role="img" aria-label="论文知识图谱"></svg>
+    <aside class="detail" id="detail"><h3>论文详情</h3><p class="hint">点击图谱中的节点查看详情。勾选「显示关系标签」可查看边的含义。</p>
+      <label class="hint"><input type="checkbox" id="showLabels"> 显示关系标签</label>
+    </aside>
+  </div>
+</section>
+
+<section id="sec-timeline">
+  <h2>时间线</h2>
+  <p class="sub">23 个文献按年份分布；点击圆点查看该论文（联动图谱高亮）。</p>
+  <div class="timeline" id="timeline"></div>
+</section>
+
+<section id="sec-cards">
+  <h2>论文卡片</h2>
+  <p class="sub">按主题分组；点击卡片联动图谱高亮并查看详情。</p>
+  <div class="cards" id="cards"></div>
+</section>
+
+<section id="sec-table">
+  <h2>对比表</h2>
+  <p class="sub">点击表头可按「论文 / 年份 / 主题」排序；受顶部搜索框过滤。</p>
+  <div style="overflow-x:auto"><table class="cmp" id="cmpTable">
+    <thead><tr>
+      <th data-k="cn">论文 ⇅</th><th data-k="year">年份 ⇅</th><th data-k="topic">主题 ⇅</th>
+      <th>核心命题</th><th>关键结论 / 数字</th><th>比较视角</th>
+    </tr></thead><tbody></tbody>
+  </table></div>
+</section>
+
+<section id="sec-formulas">
+  <h2>核心公式（分主题）</h2>
+  <p class="sub">来自 KNOWLEDGE_MAP.md Part 1 知识树；符号含义见原文"每个符号第一次出现即定义"约定。</p>
+  <div class="formula-grid">
+    <div class="fbox"><h4><span class="tag" style="background:var(--t1)">T1</span> 需求预测 / Nowcasting</h4>
+      <div class="f">ŷ<sub>t+1:t+H</sub> = f(y<sub>1:t</sub>, x<sub>1:t+H</sub>)<span class="note">预测问题设定：y<sub>t</sub> 为 t 时刻观测需求（核），x 为协变量，H 为预测跨度（分钟）</span></div>
+      <div class="f">L<sub>q</sub>(y,ŷ) = q·max(y−ŷ,0) + (1−q)·max(ŷ−y,0)<span class="note">Pinball 分位数损失：欠预测被罚 q/(1−q) 倍，"宁可多给"的数学表达</span></div>
+      <div class="f">c* = F<sup>−1</sup>( C<sub>under</sub> / (C<sub>under</sub>+C<sub>over</sub>) )<span class="note">报童模型：概率预测 → 容量决策的桥梁；C<sub>under</sub> 欠配代价 ≫ C<sub>over</sub></span></div>
+      <div class="f">H ≥ L<sub>act</sub><span class="note">时效硬约束：预测跨度必须覆盖执行延迟，否则决策永远慢一拍</span></div>
+    </div>
+    <div class="fbox"><h4><span class="tag" style="background:var(--t2)">T2</span> 扩缩容算法</h4>
+      <div class="f">desiredReplicas = ceil[ current × (currentMetric / desiredMetric) ]<span class="note">K8s HPA 阈值公式；配 tolerance 10% + stabilization window 防抖</span></div>
+      <div class="f">ŝ<sub>t+1</sub> = α·x<sub>t</sub> + (1−α)·ŝ<sub>t</sub><span class="note">指数平滑（Autopilot ensemble 基本单元）；α 大跟随快但抖、小平滑但滞后</span></div>
+      <div class="f">u(t) = K<sub>p</sub>e(t) + K<sub>i</sub>∫e + K<sub>d</sub>·de/dt<span class="note">PID 控制器（Padala 2007）；当执行延迟 L ≫ 控制周期，基于过期信号决策 → 抖振</span></div>
+    </div>
+    <div class="fbox"><h4><span class="tag" style="background:var(--t3)">T3</span> SLO 感知</h4>
+      <div class="f">P(L &gt; S) ≤ ε<span class="note">尾延迟 SLO：L 为单请求延迟，S 为目标（如 200ms），ε 为允许破损率（如 0.001）</span></div>
+      <div class="f">R = max( Q<sub>1−δ</sub>(F̂), R<sub>floor</sub> )<span class="note">悲观防护：走预测分布上分位数 + 硬下限兜底，宁可过配不赌预测</span></div>
+      <div class="f">t<sub>99</sub> = 4.605 / (μ − λ)<span class="note">M/M/1 直觉：利用率 ρ→1 时尾延迟发散；超卖必须配 guardrail 的排队论根因</span></div>
+    </div>
+    <div class="fbox"><h4><span class="tag" style="background:var(--t4)">T4</span> 压测与验证</h4>
+      <div class="f">N = X·(R + Z)<span class="note">Little 定律：closed-loop 负载下 N 虚拟用户，系统恶化时负载自动掉 → 藏住过载</span></div>
+      <div class="f">保真度 = D<sub>KL</sub>(F<sub>R</sub> ‖ F<sub>S</sub>)<span class="note">合成负载 vs 真实流量的分布距离；越小越好</span></div>
+      <div class="f">放行条件：violations(π<sub>new</sub>) ≤ violations(π<sub>old</sub>) 且 cost 更低<span class="note">Shadow / Canary 验证：复制生产流量对比窗口 T 内 SLO 指标</span></div>
+    </div>
+  </div>
+</section>
+</main>
+<footer>
+  数据来源：<kbd>KNOWLEDGE_MAP.md</kbd> v1（2026-09-12）· <kbd>README.md</kbd>。关系边仅收录知识图谱中明确写出的引用 / 演进 / 对比关系，未脑补。单文件自包含，无外部网络依赖。
+</footer>
+
+<script>
+"use strict";
+/* ============ 数据（来自 KNOWLEDGE_MAP.md Part 2 论文清单） ============ */
+const TOPICS = {
+  T1:{name:"需求预测 / Nowcasting", color:"#2563eb"},
+  T2:{name:"扩缩容算法", color:"#16a34a"},
+  T3:{name:"SLO 感知", color:"#ea580c"},
+  T4:{name:"压测与验证", color:"#9333ea"}
+};
+const PERSP = {
+  latency:"执行延迟", cost:"非对称代价", burst:"非平稳/突发",
+  rollout:"灰度预检", data:"数据集/基准", survey:"综述", baseline:"工业基线"
+};
+const PAPERS = [
+{id:"deepar",cn:"DeepAR 概率预测",title:"DeepAR: Probabilistic Forecasting with Autoregressive Recurrent Networks",authors:"David Salinas, Valentin Flunkert, Jan Gasthaus",org:"Amazon Research",venue:"arXiv:1704.04110 (2017)，IJF 2020",year:2017,topics:["T1"],persp:["cost","burst"],arxiv:"https://arxiv.org/abs/1704.04110",
+prop:"在大量相关序列上联合训练一个自回归 RNN，直接输出未来分布参数，开创「一个全局模型预测成千上万条序列」范式。",
+res:"全局模型路线成为 fleet-scale 唯一可扩展方案；分布输出可直接接报童公式做容量决策。",
+learn:"fleet 有几十万条需求曲线时「一序列一模型」运维爆炸，全局模型是唯一可扩展路线。",
+gap:"只管预测准，不管 H ≥ L_act 与非对称代价；分布到容量决策之间还差一个报童公式。",
+kw:"概率预测 分位数 全局模型 RNN 自回归 亚马逊"},
+{id:"tft",cn:"Temporal Fusion Transformer",title:"Temporal Fusion Transformers for Interpretable Multi-horizon Forecasting",authors:"Bryan Lim, Sercan Ö. Arık, Nicolas Loeff, Tomas Pfister",org:"Oxford / Google Cloud AI",venue:"arXiv:1912.09363 (2019)，IJF 2021",year:2019,topics:["T1"],persp:["cost","burst"],arxiv:"https://arxiv.org/abs/1912.09363",
+prop:"静态特征 / 已知未来输入 / 历史观测三类异构输入统一进 attention，一次输出整段 horizon 的分位数（P10/P50/P90）+ 变量重要性。",
+res:"多步分位数一次输出；变量重要性提供可解释性。",
+learn:"autoscaling 输入天然异构（静态/已知未来/历史），TFT 是教科书式结构。",
+gap:"interpretability 不如 guardrail 实在；推理延迟对分钟级 nowcasting 是负担。",
+kw:"注意力 分位数 多步预测 异构输入 可解释 谷歌"},
+{id:"prophet",cn:"Prophet 基线",title:"Forecasting at Scale (Prophet)",authors:"Sean J. Taylor, Benjamin Letham",org:"Facebook Core Data Science",venue:"The American Statistician 2018",year:2018,topics:["T1"],persp:["baseline"],
+prop:"加性模型（趋势 + 多重季节性 + 节假日），不懂时序也能调出靠谱预测，工业界 baseline。",
+res:"成为验证「需求曲线有无可预测结构」的最低成本探针。",
+learn:"验证需求曲线有无可预测结构的最低成本探针。",
+gap:"为天/周粒度设计，分钟级噪声与 flash crowd 非其主场。",
+kw:"加性模型 季节性 节假日 baseline 脸书"},
+{id:"rc",cn:"Resource Central",title:"Resource Central",authors:"Eli Cortez 等",org:"Microsoft / MSR",venue:"SOSP 2017",year:2017,topics:["T1"],persp:["cost"],
+prop:"首次大规模刻画 Azure VM 负载（「历史行为是未来的好预测器」），建成离线训练 + 在线 serving 的预测中台，直接驱动 VM 调度超分。",
+res:"hyperscaler 把「预测」做成平台能力的标准答案：遥测 → 训练 → serving → 多资源管理器调用。",
+learn:"预测中台的标准答案形态；预测误差如何被调度超分吸收。",
+gap:"预测的是 VM 生命周期这类慢变量，非分钟级 nowcasting；超分代价模型比在线 SLO 约束简单。",
+kw:"Azure 微软 预测中台 超分 VM 平台化"},
+{id:"autopilot",cn:"Autopilot",title:"Autopilot: Workload Autoscaling at Google",authors:"Krzysztof Rzadca, Paweł Findeisen, Jacek Świderski 等",org:"Google",venue:"EuroSys 2020",year:2020,topics:["T2","T1","T3"],persp:["latency","cost","rollout"],
+prop:"生产级三闭环（horizontal 副本 + vertical CPU + vertical 内存），指数平滑 ensemble + cost function 自动定 Borg 容器 limit。",
+res:"slack 46%→23%；严重 OOM 作业数降为 1/10。",
+learn:"hyperscaler「ML + 启发式 + 强 guardrail」最完整公开样本；slack / OOM 可直接抄的评估指标。",
+gap:"冷启动/预热的 L_act 建模细节淡化；多租户干扰下的 limit 失效案例缺失；单 job sizing，非多服务 SLO 联合决策。",
+kw:"谷歌 Borg 三闭环 指数平滑 ensemble guardrail slack OOM 垂直扩缩容"},
+{id:"borg",cn:"Borg 集群管理",title:"Large-scale Cluster Management at Google with Borg",authors:"Abhishek Verma 等",org:"Google",venue:"EuroSys 2015",year:2015,topics:["T1"],persp:["data"],
+prop:"十年集群管理定稿（准入 / 装箱 / 超分 / 抢占）+ 公开 Borg trace，成领域事实标准数据源。",
+res:"cell、priority band、资源回收等概念成为后续工作共同语言。",
+learn:"不是预测论文，而是「预测的目标系统长什么样」——理解 cell 与资源回收，才知道预测误差如何被放大/吸收。",
+gap:"2015 年 Borg 无 ML 预测组件；trace 脱敏且旧。",
+kw:"谷歌 集群管理 trace 数据集 装箱 超分 抢占"},
+{id:"alibaba",cn:"阿里混部 Trace",title:"Characterizing Co-located Datacenter Workloads: An Alibaba Case Study",authors:"Yue Cheng, Zheng Chai, Ali Anwar",org:"GMU / IBM",venue:"arXiv:1808.02919 (2018，技术报告)",year:2018,topics:["T1"],persp:["data"],arxiv:"https://arxiv.org/abs/1808.02919",
+prop:"首个区分在线长任务 / 离线批任务的公开混部 trace 分析（1313 台），揭示真实混部集群中超分/超售行为。",
+res:"1313 台、24 小时；唯一公开可拿、带作业类别标签的混部数据。",
+learn:"适合做预测模型离线验证集的公开混部数据。",
+gap:"仅 24 小时、1313 台，fleet-scale 外推须谨慎；2018 年老 trace。",
+kw:"阿里 混部 trace 在离线 批任务 数据集"},
+{id:"padala",cn:"自适应控制 Padala",title:"Adaptive Control of Virtualized Resources in Utility Computing Environments",authors:"Pradeep Padala 等",org:"Michigan / HP Labs",venue:"EuroSys 2007",year:2007,topics:["T2"],persp:["latency"],
+prop:"控制理论 autoscaling 奠基之一：无 first-principle 模型时 black-box 辨识 + 自适应 MIMO 控制器（LQR 形式），Xen 多租户下按应用层 QoS 动态调资源份额。",
+res:"「先辨识、再控制」框架成为所有 SLO-aware autoscaler 思想源头。",
+learn:"辨识-控制框架；MIMO 控制器处理多资源耦合。",
+gap:"小规模 testbed，无 fleet-scale 的分钟级 L、非平稳流量、真实 guardrail。",
+kw:"控制理论 PID LQR MIMO 辨识 Xen QoS"},
+{id:"monasca",cn:"Monasca 预测式扩缩容",title:"Predictive Auto-scaling with OpenStack Monasca",authors:"Giacomo Lanciano 等",org:"Scuola Normale Superiore",venue:"UCC 2021",year:2021,topics:["T2"],persp:["latency","burst"],
+prop:"「阈值作用在预测值上」的开源组件：RNN/MLP 预测 15 分钟后平均 CPU，连续 3 次超 80% 才 scale-out，提前消化 30 分钟爬坡负载。",
+res:"forecast-then-threshold：不动阈值体系、只换输入信号，最易落地的预测式改造。",
+learn:"预测式改造的最小侵入路径。",
+gap:"预测误差的非对称代价未形式化；无生产级灰度验证。",
+kw:"OpenStack 预测阈值 RNN MLP 15分钟 开源"},
+{id:"slahpa",cn:"动态阈值 HPA",title:"SLA-Adaptive Threshold Adjustment for a Kubernetes HPA",authors:"Olesia Pozdniakova 等",org:"VGTU",venue:"Electronics (MDPI) 2024",year:2024,topics:["T2"],persp:["cost"],
+prop:"EDA + 移动平均动态识别满足 SLO 的目标利用率阈值，SMA 版以轻微过配换 SLO 合规。",
+res:"点出「阈值是拍脑袋定的」这一最大痛点；动态阈值可作 HPA 外挂调参器。",
+learn:"阈值不应是静态拍脑袋，而应随负载动态识别。",
+gap:"偏统计描述，无突发流量预测成分；阈值抖动稳定性未讨论。",
+kw:"K8s HPA 动态阈值 EDA 移动平均 SLO"},
+{id:"qusurvey",cn:"Autoscaling 综述",title:"Auto-scaling Web Applications in Clouds: A Taxonomy and Survey",authors:"Chenhao Qu（合著者/机构待核实）",org:"[待核实]",venue:"arXiv:1609.09224 (2016)[期刊状态待核实]",year:2016,topics:["T2"],persp:["survey"],arxiv:"https://arxiv.org/abs/1609.09224",
+prop:"autoscaling taxonomy：时机 reactive/proactive/hybrid × 目标 cost/SLO × 技术（阈值/控制/排队/ML），归类上百篇工作并指薄弱点。",
+res:"新人最快全景图；选型对照防重复造轮子。",
+learn:"用 taxonomy 快速定位自己系统在 reactive/proactive/hybrid × cost/SLO 矩阵中的位置。",
+gap:"2016 年综述，无 K8s/容器原生、serverless、hyperscaler 生产经验论文覆盖。",
+kw:"综述 taxonomy 分类 reactive proactive hybrid"},
+{id:"hpadocs",cn:"K8s HPA 文档",title:"(参考文档) Kubernetes 官方文档：Horizontal Pod Autoscaler",authors:"—",org:"kubernetes.io",venue:"持续更新",year:"持续更新",topics:["T2"],persp:["latency","baseline"],
+prop:"阈值式工业标准实现：比例式副本计算 + tolerance（默认 10%）+ scaleUp/scaleDown stabilization（缩容默认 300 秒取窗口最大值）+ behavior 策略。",
+res:"desiredReplicas = ceil[current × (currentMetric/desiredMetric)]；工业界用简单机制防抖的活教材。",
+learn:"所有自研 autoscaler 的 baseline 对照组。",
+gap:"纯反应式无预测；不解释参数背后的调参血泪。",
+kw:"Kubernetes HPA 阈值 tolerance stabilization 反应式 参考文档"},
+{id:"heracles",cn:"Heracles",title:"Heracles: Improving Resource Efficiency at Scale",authors:"David Lo 等",org:"Stanford + Google",venue:"ISCA 2015",year:2015,topics:["T3"],persp:["cost"],
+prop:"反馈控制器让 latency-critical 与 best-effort 安全混部，动态划分 CPU / LLC / 内存带宽，LC 的 SLO 不被侵犯。",
+res:"混部「安全边界」范式源头：先定不可侵犯的 LC 目标，再让渡剩余资源。",
+learn:"安全边界范式；干扰主要伤害尾延迟而非均值。",
+gap:"单机内资源划分，不涉跨机扩缩容决策与分钟级执行延迟。",
+kw:"混部 干扰 尾延迟 反馈控制 LLC 隔离 谷歌"},
+{id:"parties",cn:"PARTIES",title:"PARTIES: QoS-Aware Resource Partitioning for Multiple Interactive Services",authors:"Shuang Chen, Christina Delimitrou, José Martínez",org:"Cornell",venue:"ASPLOS 2019",year:2019,topics:["T3"],persp:["cost"],
+prop:"打破「一机只能跑一个 LC 服务」：软硬件分区让多个 LC 同机共存且 QoS 不破，吞吐平均 +61%。",
+res:"LC 资源 fungible、可在线试错找分区；吞吐 +61%。",
+learn:"「高优服务之间也要超卖」场景直接可用；在线试错找分区的方法。",
+gap:"受控集群实验；生产 noisy neighbor 跨机跨租户时变，论文没回答。",
+kw:"康奈尔 QoS 分区 多LC共存 吞吐 混部"},
+{id:"protean",cn:"Protean",title:"Protean: VM Allocation Service at Scale",authors:"Ori Hadary 等",org:"Azure + MSR",venue:"OSDI 2020",year:2020,topics:["T3"],persp:["cost","rollout"],
+prop:"Azure 生产 VM 分配器：policy/mechanism 分离，规则式 Allocation Agent + 多层缓存做到毫秒级分配，单可用区 10–100k 机器，COVID-19 容量 crunch 实战验证。",
+res:"fleet-scale「快而不完美」哲学：牺牲分配质量换并发吞吐；是 guardrail 的工程对应物。",
+learn:"大规模下「快而不完美」胜过「慢而最优」；policy/mechanism 分离的可演进架构。",
+gap:"它是 placement（放哪台）非 autoscaling（何时扩缩）；SLO 约束是用户侧需求非内生优化目标。",
+kw:"Azure 微软 VM分配 毫秒级 placement 容量crunch"},
+{id:"sinan",cn:"Sinan",title:"Sinan: ML-Based and QoS-Aware Resource Management for Cloud Microservices",authors:"Yanqi Zhang 等",org:"Cornell",venue:"ASPLOS 2021",year:2021,topics:["T3"],persp:["cost","latency"],
+prop:"CNN 短期预测 + Boosted Trees 长期演化，预测某资源配置下端到端延迟与 QoS 破损概率，逐 tier 在线调资源，省 25–59% 且 QoS 不破。",
+res:"「预测 QoS 破损概率」而非「预测延迟点估计」——guardrail 的数学雏形；DeathStarBench 评估套路可复用。",
+learn:"破损概率预测比点估计更接近 guardrail 形态；逐 tier 在线调资源。",
+gap:"GCE 实验规模远小于生产；没处理预测器执行延迟与误报致扩缩震荡。",
+kw:"康奈尔 微服务 QoS破损概率 CNN 逐tier DeathStarBench"},
+{id:"firm",cn:"FIRM",title:"FIRM: An Intelligent Fine-Grained Resource Management Framework for SLO-Oriented Microservices",authors:"Haoran Qiu 等",org:"UIUC",venue:"OSDI 2020",year:2020,topics:["T3"],persp:["cost"],
+prop:"三级 ML 闭环（定位肇事微服务 → 定位 contention 资源 → 动态 reprovision），SLO violations 降 16 倍、CPU limit 降 62%、尾延迟降 11 倍。",
+res:"SLO 破损「检测-定位-缓解」完整闭环；telemetry+ML 取代手写启发式的路线图。",
+learn:"检测-定位-缓解闭环设计；用 ML 替代手写启发式的演进路径。",
+gap:"缓解动作只有 reprovision（加资源），无缩容侧悲观保护；误定位代价（加错地方）未讨论。",
+kw:"微服务 SLO 三级闭环 定位 reprovision 尾延迟"},
+{id:"treadmill",cn:"Treadmill",title:"Treadmill: Attributing the Source of Tail Latency through Precise Load Testing and Statistical Inference",authors:"Yunqi Zhang, David Meisner, Jason Mars, Lingjia Tang",org:"Facebook / Michigan",venue:"ISCA 2016",year:2016,topics:["T4"],persp:["rollout"],
+prop:"指出压测工具自身缺陷（coordinated omission、统计聚合错误）会得出误导结论；精确负载生成 + 统计推断，不扰动生产归因尾延迟来源。",
+res:"「压测工具本身会撒谎」的奠基方法论；autoscaler 验证前必读。",
+learn:"先校准压测工具，再谈压测结论；coordinated omission 的识别与消除。",
+gap:"单服务延迟归因，无扩缩容决策闭环。",
+kw:"压测 尾延迟归因 coordinated omission 负载生成 脸书"},
+{id:"dsb",cn:"DeathStarBench",title:"DeathStarBench",authors:"Y. Gan 等",org:"Cornell",venue:"ASPLOS 2019",year:2019,topics:["T4"],persp:["rollout","data"],
+prop:"5 个端到端微服务应用（社交/媒体/酒店/电商/银行），成学术界验证 SLO 与弹性的事实标准基准。",
+res:"开源可跑；验证 autoscaler 最坏情况行为最便宜的沙箱。",
+learn:"用标准基准做 autoscaler 回归/对比，避免自说自话。",
+gap:"合成拓扑，缺真实多租户干扰与非平稳突发。",
+kw:"基准 微服务 社交 电商 酒店 开源 康奈尔"},
+{id:"sieve",cn:"Sieve",title:"Sieve: Automatic Reliability Testing for Cluster Management Controllers",authors:"Xudong Sun 等",org:"UIUC [待核实]",venue:"OSDI '22",year:2022,topics:["T4"],persp:["rollout"],
+prop:"系统性扰动控制器可见的集群状态（differential oracle），全自动挖出 10 个主流 K8s 控制器 46 个新 bug（35 确认 / 22 修复），无需专家写 spec。",
+res:"「控制器在异步/并发下会怎么错」的测试方法论，可套用到自研 autoscaler 回归测试。",
+learn:"differential oracle 思想；用状态扰动挖并发 bug。",
+gap:"只测控制逻辑正确性，不测生产负载下 SLO/cost trade-off。",
+kw:"K8s 控制器测试 differential oracle 状态扰动 bug"},
+{id:"fate",cn:"FATE / DESTINI",title:"FATE and DESTINI",authors:"Haryadi S. Gunawi 等",org:"Berkeley / Facebook",venue:"NSDI '11",year:2011,topics:["T4"],persp:["rollout"],
+prop:"FATE 用 failure ID 系统性枚举多重故障组合（4 万种），DESTINI 用 Datalog 写恢复正确性 spec，在 HDFS/ZooKeeper/Cassandra 挖 16+ 新 bug。",
+res:"「autoscaler 在故障下会不会雪崩」需要系统性故障枚举思维，而非随机 chaos。",
+learn:"故障注入要系统性枚举组合，而非随机 chaos；failure ID 建模。",
+gap:"针对存储恢复，不涉扩缩容策略与 SLO 交互。",
+kw:"故障注入 系统性枚举 chaos 伯克利 脸书"},
+{id:"openclosed",cn:"Open vs Closed",title:"Open Versus Closed: A Cautionary Tale",authors:"Bianca Schroeder, Adam Wierman, Mor Harchol-Balter",org:"CMU",venue:"NSDI '06",year:2006,topics:["T4"],persp:["rollout"],
+prop:"证明 open/closed-loop 负载生成器行为天差地别：8 条指导原则 + partly-open 模型。",
+res:"「压测 autoscaler 必须用 open-loop」的理论源头；选错模型系统性低估过载风险。",
+learn:"closed-loop 会自我节流藏住过载；压测 autoscaler 必须用 open-loop（如 wrk2）。",
+gap:"纯方法论，无 autoscaling 实例。",
+kw:"负载生成 open-loop closed-loop partly-open CMU 方法论"},
+{id:"tailbench",cn:"TailBench",title:"TailBench",authors:"Harshad Kasture, Daniel Sanchez",org:"MIT",venue:"IISWC 2016",year:2016,topics:["T4"],persp:["rollout","data"],
+prop:"8 个延迟敏感应用 + warmup/measurement harness，专为尾延迟研究设计。",
+res:"验证 SLO guardrail 时比 DeathStarBench 更轻量；单服务延迟刻画更细。",
+learn:"轻量尾延迟基准；warmup/measurement 方法学。",
+gap:"无多服务调用链，不适合测级联故障下的扩缩容。",
+kw:"基准 尾延迟 MIT 轻量 warmup"}
+];
+/* 边：仅收录 KNOWLEDGE_MAP 明确写出的引用/演进/对比关系 */
+const EDGES = [
+ {s:"deepar",t:"tft",label:"全局模型范式演进",type:"演进"},
+ {s:"prophet",t:"deepar",label:"工业界 baseline",type:"基线"},
+ {s:"prophet",t:"tft",label:"工业界 baseline",type:"基线"},
+ {s:"rc",t:"protean",label:"Azure / MSR 一脉",type:"同源"},
+ {s:"borg",t:"alibaba",label:"公开 trace 数据集",type:"同类数据"},
+ {s:"hpadocs",t:"monasca",label:"forecast-then-threshold",type:"构建于"},
+ {s:"hpadocs",t:"slahpa",label:"动态阈值外挂",type:"构建于"},
+ {s:"padala",t:"heracles",label:"辨识-控制思想源头",type:"思想源头"},
+ {s:"padala",t:"autopilot",label:"控制理论 vs 工业界方案",type:"对比"},
+ {s:"qusurvey",t:"padala",label:"taxonomy 覆盖",type:"综述覆盖"},
+ {s:"qusurvey",t:"monasca",label:"taxonomy 覆盖",type:"综述覆盖"},
+ {s:"qusurvey",t:"slahpa",label:"taxonomy 覆盖",type:"综述覆盖"},
+ {s:"qusurvey",t:"autopilot",label:"taxonomy 覆盖",type:"综述覆盖"},
+ {s:"heracles",t:"parties",label:"一机多 LC 共存",type:"演进"},
+ {s:"heracles",t:"firm",label:"同解混部干扰",type:"同解一题"},
+ {s:"parties",t:"sinan",label:"Cornell QoS 一脉",type:"同源"},
+ {s:"sinan",t:"firm",label:"微服务 SLO 双璧",type:"同解一题"},
+ {s:"sinan",t:"dsb",label:"用其做评估",type:"使用"},
+ {s:"protean",t:"autopilot",label:"hyperscaler 生产哲学",type:"同源"},
+ {s:"treadmill",t:"dsb",label:"压测方法论先行",type:"方法指导"},
+ {s:"openclosed",t:"treadmill",label:"负载生成理论",type:"方法指导"},
+ {s:"openclosed",t:"dsb",label:"必须用 open-loop",type:"方法指导"},
+ {s:"openclosed",t:"tailbench",label:"必须用 open-loop",type:"方法指导"},
+ {s:"fate",t:"sieve",label:"系统性枚举思想",type:"思想源头"},
+ {s:"sieve",t:"hpadocs",label:"挖 K8s 控制器 bug",type:"测试对象"},
+ {s:"tailbench",t:"dsb",label:"轻量 vs 全栈基准",type:"对比"}
+];
+/* ============ 工具 ============ */
+const byId = id => PAPERS.find(p=>p.id===id);
+const deg = {}; PAPERS.forEach(p=>deg[p.id]=0); EDGES.forEach(e=>{deg[e.s]++;deg[e.t]++;});
+document.getElementById("edgeCount").textContent = EDGES.length;
+const topicName = t => TOPICS[t].name;
+const perspName = k => PERSP[k]||k;
+
+/* ============ 图谱 ============ */
+const svgNS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("graph");
+const W=1160,H=660;
+const CLUSTER={T1:[W*0.24,H*0.34],T2:[W*0.76,H*0.30],T3:[W*0.26,H*0.72],T4:[W*0.74,H*0.70]};
+const nodes=PAPERS.map(p=>({id:p.id,x:0,y:0,vx:0,vy:0}));
+const nById={}; nodes.forEach(n=>nById[n.id]=n);
+(function layout(){
+  nodes.forEach(n=>{const p=byId(n.id),c=CLUSTER[p.topics[0]];
+    n.x=c[0]+(Math.random()-0.5)*180;n.y=c[1]+(Math.random()-0.5)*130;});
+  for(let it=0;it<520;it++){
+    for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+      const a=nodes[i],b=nodes[j];let dx=a.x-b.x,dy=a.y-b.y;
+      const d2=dx*dx+dy*dy+60,d=Math.sqrt(d2),f=Math.min(5600/d2,3)/d;
+      a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f;}
+    EDGES.forEach(e=>{const a=nById[e.s],b=nById[e.t];
+      const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)+0.01,f=(d-150)*0.016/d;
+      a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f;});
+    nodes.forEach(n=>{const p=byId(n.id),c=CLUSTER[p.topics[0]];
+      n.vx+=(c[0]-n.x)*0.022;n.vy+=(c[1]-n.y)*0.022;
+      n.vx+=(W/2-n.x)*0.004;n.vy+=(H/2-n.y)*0.004;
+      n.vx*=0.86;n.vy*=0.86;n.x+=n.vx;n.y+=n.vy;
+      n.x=Math.max(70,Math.min(W-70,n.x));n.y=Math.max(52,Math.min(H-44,n.y));});
+  }
+})();
+const defs=document.createElementNS(svgNS,"defs");
+defs.innerHTML='<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker>';
+svg.appendChild(defs);
+const gE=document.createElementNS(svgNS,"g"),gEL=document.createElementNS(svgNS,"g"),gN=document.createElementNS(svgNS,"g");
+svg.appendChild(gE);svg.appendChild(gEL);svg.appendChild(gN);
+const edgeEls={},labelEls={};
+EDGES.forEach((e,i)=>{
+  const a=nById[e.s],b=nById[e.t];
+  const ln=document.createElementNS(svgNS,"line");
+  ln.setAttribute("class","edge");ln.setAttribute("marker-end","url(#arr)");
+  gE.appendChild(ln);edgeEls[i]=ln;
+  const tx=document.createElementNS(svgNS,"text");
+  tx.setAttribute("class","edge-label");tx.textContent=e.label+"（"+e.type+"）";
+  gEL.appendChild(tx);labelEls[i]=tx;
+});
+function drawEdges(){
+  EDGES.forEach((e,i)=>{
+    const a=nById[e.s],b=nById[e.t],ln=edgeEls[i];
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)+0.01;
+    const ra=15+deg[e.s]*2,rb=15+deg[e.t]*2;
+    const x1=a.x+dx/d*ra,y1=a.y+dy/d*ra,x2=b.x-dx/d*(rb+4),y2=b.y-dy/d*(rb+4);
+    ln.setAttribute("x1",x1);ln.setAttribute("y1",y1);
+    ln.setAttribute("x2",x2);ln.setAttribute("y2",y2);
+    const lb=labelEls[i];
+    lb.setAttribute("x",(x1+x2)/2);lb.setAttribute("y",(y1+y2)/2-5);
+  });
+}
+const nodeEls={};
+nodes.forEach(n=>{
+  const p=byId(n.id),r=15+deg[n.id]*2;
+  const g=document.createElementNS(svgNS,"g");
+  g.setAttribute("class","node");g.dataset.id=n.id;
+  const c=document.createElementNS(svgNS,"circle");
+  c.setAttribute("r",r);c.setAttribute("fill",TOPICS[p.topics[0]].color);
+  g.appendChild(c);
+  if(p.topics.length>1){ // 跨主题节点：虚线外圈
+    const ring=document.createElementNS(svgNS,"circle");
+    ring.setAttribute("r",r+5);ring.setAttribute("fill","none");
+    ring.setAttribute("stroke","#111827");ring.setAttribute("stroke-width","1.6");
+    ring.setAttribute("stroke-dasharray","5,3");g.appendChild(ring);
+  }
+  const t=document.createElementNS(svgNS,"text");
+  t.setAttribute("y",r+14);t.textContent=p.cn;g.appendChild(t);
+  const title=document.createElementNS(svgNS,"title");title.textContent=p.title;g.appendChild(title);
+  gN.appendChild(g);nodeEls[n.id]=g;
+  g.addEventListener("click",ev=>{ev.stopPropagation();select(n.id);});
+  // 拖拽
+  g.addEventListener("pointerdown",ev=>{
+    ev.stopPropagation();g.setPointerCapture(ev.pointerId);
+    const move=e2=>{
+      const pt=svgPoint(e2);n.x=Math.max(70,Math.min(W-70,pt.x));n.y=Math.max(52,Math.min(H-44,pt.y));
+      drawAll();
+    };
+    const up=()=>{g.removeEventListener("pointermove",move);g.removeEventListener("pointerup",up);};
+    g.addEventListener("pointermove",move);g.addEventListener("pointerup",up);
+  });
+});
+function svgPoint(e){const r=svg.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/r.width*W, y:(e.clientY-r.top)/r.height*H};}
+function drawNodes(){
+  nodes.forEach(n=>{const g=nodeEls[n.id];g.setAttribute("transform","translate("+n.x+","+n.y+")");});
+}
+function drawAll(){drawEdges();drawNodes();}
+drawAll();
+svg.addEventListener("click",()=>select(null));
+document.getElementById("showLabels").addEventListener("change",e=>{
+  Object.values(labelEls).forEach(l=>l.classList.toggle("on",e.target.checked));
+});
+
+/* 图例 */
+const legend=document.getElementById("legend");
+Object.entries(TOPICS).forEach(([k,v])=>{
+  const s=document.createElement("span");
+  s.innerHTML="<i style='background:"+v.color+"'></i>"+k+" "+v.name;
+  s.title="点击高亮该主题";s.onclick=()=>highlightTopic(k);
+  legend.appendChild(s);
+});
+/* 比较视角 chips（README 约定固定四个） */
+const chips=document.getElementById("chips");
+["latency","cost","burst","rollout"].forEach(k=>{
+  const c=document.createElement("span");c.className="chip";c.textContent="⚖ "+PERSP[k];c.dataset.k=k;
+  c.title="点击高亮具有该比较视角的论文";
+  c.onclick=()=>{const on=c.classList.toggle("on");
+    document.querySelectorAll(".chip").forEach(x=>{if(x!==c)x.classList.remove("on");});
+    highlightPersp(on?k:null);};
+  chips.appendChild(c);
+});
+function highlightTopic(t){
+  const ids=new Set(PAPERS.filter(p=>p.topics.includes(t)).map(p=>p.id));
+  applyDim(id=>ids.has(id));
+}
+function highlightPersp(k){
+  if(!k){applyDim(()=>true);return;}
+  const ids=new Set(PAPERS.filter(p=>p.persp.includes(k)).map(p=>p.id));
+  applyDim(id=>ids.has(id));
+}
+function applyDim(keep){
+  nodes.forEach(n=>nodeEls[n.id].classList.toggle("dim",!keep(n.id)));
+  EDGES.forEach((e,i)=>{const on=keep(e.s)&&keep(e.t);
+    edgeEls[i].classList.toggle("dim",!on);});
+  document.querySelectorAll(".tl-dot,.tl-label").forEach(el=>
+    el.classList.toggle("dim",!keep(el.dataset.id)));
+  document.querySelectorAll(".card").forEach(el=>
+    el.style.display=keep(el.dataset.id)?"":"none");
+  renderTable();
+}
+
+/* ============ 详情面板 ============ */
+function select(id){
+  document.querySelectorAll(".node").forEach(g=>g.classList.remove("sel"));
+  if(!id){applyDim(()=>true);fillDetail(null);return;}
+  nodeEls[id].classList.add("sel");
+  const nb=new Set([id]);
+  EDGES.forEach(e=>{if(e.s===id)nb.add(e.t);if(e.t===id)nb.add(e.s);});
+  applyDim(x=>nb.has(x));
+  EDGES.forEach((e,i)=>{const on=(e.s===id||e.t===id);
+    edgeEls[i].classList.toggle("active",on);
+    if(on)labelEls[i].classList.add("on");});
+  fillDetail(byId(id));
+}
+function fillDetail(p){
+  const d=document.getElementById("detail");
+  if(!p){d.innerHTML="<h3>论文详情</h3><p class='hint'>点击图谱中的节点查看详情。</p><label class='hint'><input type='checkbox' id='showLabels2'> 显示关系标签</label>";
+    const cb=document.getElementById("showLabels2");
+    if(cb)cb.addEventListener("change",e=>Object.values(labelEls).forEach(l=>l.classList.toggle("on",e.target.checked)));
+    return;}
+  const rels=EDGES.filter(e=>e.s===p.id||e.t===p.id).map(e=>{
+    const other=e.s===p.id?byId(e.t):byId(e.s);
+    const dir=e.s===p.id?"→":"←";
+    return "<div>"+dir+" <b>"+other.cn+"</b>："+e.label+"（"+e.type+"）</div>";}).join("");
+  d.innerHTML=
+   "<h3>"+p.cn+"</h3>"+
+   "<div class='meta'>"+p.title+"<br>"+p.authors+"（"+p.org+"）<br>"+p.venue+
+   (p.arxiv?"<br><a href='"+p.arxiv+"' target='_blank' rel='noopener'>arXiv 原文 ↗</a>":"")+"</div>"+
+   "<div>"+p.topics.map(t=>"<span class='tag' style='background:"+TOPICS[t].color+"'>"+t+" "+TOPICS[t].name+"</span>").join("")+
+   p.persp.map(k=>"<span class='tag' style='background:#6b7280'>"+PERSP[k]+"</span>").join("")+"</div>"+
+   "<dt>核心命题</dt><dd>"+p.prop+"</dd>"+
+   "<dt>关键结论</dt><dd>"+p.res+"</dd>"+
+   "<dt>学什么</dt><dd>"+p.learn+"</dd>"+
+   "<dt>没覆盖的生产现实</dt><dd>"+p.gap+"</dd>"+
+   (rels?"<dt>关系（"+EDGES.filter(e=>e.s===p.id||e.t===p.id).length+" 条）</dt><dd class='rel'>"+rels+"</dd>":"");
+}
+
+/* ============ 时间线 ============ */
+(function timeline(){
+  const tl=document.getElementById("timeline");
+  const t0=2005.5,t1=2024.9;
+  for(let y=2006;y<=2024;y+=2){
+    const s=document.createElement("div");s.className="tl-year";
+    s.style.left=((y-t0)/(t1-t0)*100)+"%";s.textContent=y;tl.appendChild(s);
+    const ax=document.createElement("div");ax.className="tl-axis";tl.appendChild(ax);
+  }
+  const perYear={};
+  PAPERS.forEach(p=>{
+    const yr=(typeof p.year==="number")?p.year:2024.6;
+    perYear[yr]=perYear[yr]||0;const idx=perYear[yr]++;
+    const dot=document.createElement("div");dot.className="tl-dot";dot.dataset.id=p.id;
+    dot.style.left=((yr-t0)/(t1-t0)*100)+"%";
+    dot.style.top=(168-idx*30)+"px";
+    dot.style.background=TOPICS[p.topics[0]].color;dot.title=p.cn+"（"+p.venue+"）";
+    dot.onclick=()=>{select(p.id);document.getElementById("sec-graph").scrollIntoView({behavior:"smooth"});};
+    tl.appendChild(dot);
+    const lb=document.createElement("div");lb.className="tl-label";lb.dataset.id=p.id;
+    lb.style.left=((yr-t0)/(t1-t0)*100)+"%";lb.style.top=(176-idx*30)+"px";
+    lb.textContent=p.cn;lb.title=p.title;
+    lb.onclick=dot.onclick;tl.appendChild(lb);
+  });
+  const cont=document.createElement("div");cont.className="tl-label";cont.dataset.id="hpadocs";
+  cont.style.left=((2024.6-t0)/(t1-t0)*100)+"%";cont.style.top="176px";
+  cont.style.color="#9ca3af";cont.textContent="◀ HPA 文档持续更新";tl.appendChild(cont);
+})();
+
+/* ============ 卡片 ============ */
+(function cards(){
+  const box=document.getElementById("cards");
+  Object.entries(TOPICS).forEach(([tk,tv])=>{
+    const list=PAPERS.filter(p=>p.topics[0]===tk);
+    const h=document.createElement("h3");
+    h.style.borderColor=tv.color;h.textContent=tk+" · "+tv.name+"（"+list.length+"）";
+    box.appendChild(h);
+    const grid=document.createElement("div");grid.className="card-grid";
+    list.forEach(p=>{
+      const c=document.createElement("div");c.className="card";c.dataset.id=p.id;
+      c.innerHTML="<h4>"+p.cn+"</h4><div class='m'>"+p.authors+" · "+p.org+"<br>"+p.venue+"</div>"+
+        "<p>"+p.prop+"</p><div class='nums'>📌 "+p.res+"</div>"+
+        "<div style='margin-top:8px'>"+p.persp.map(k=>"<span class='tag' style='background:#6b7280'>"+PERSP[k]+"</span>").join("")+"</div>";
+      c.onclick=()=>{select(p.id);document.getElementById("sec-graph").scrollIntoView({behavior:"smooth"});};
+      grid.appendChild(c);
+    });
+    box.appendChild(grid);
+  });
+})();
+
+/* ============ 对比表 ============ */
+let sortK="year",sortD=1;
+document.querySelectorAll("#cmpTable th[data-k]").forEach(th=>{
+  th.onclick=()=>{const k=th.dataset.k;
+    if(sortK===k)sortD*=-1;else{sortK=k;sortD=1;}renderTable();};
+});
+function matchQ(p,q){
+  if(!q)return true;
+  const s=(p.cn+" "+p.title+" "+p.authors+" "+p.org+" "+p.venue+" "+p.prop+" "+p.res+" "+p.kw+" "+p.persp.map(perspName).join(" ")).toLowerCase();
+  return s.includes(q.toLowerCase());
+}
+function renderTable(){
+  const q=(document.getElementById("q").value||"").trim();
+  const tb=document.querySelector("#cmpTable tbody");tb.innerHTML="";
+  const rows=PAPERS.filter(p=>matchQ(p,q)).slice().sort((a,b)=>{
+    let va=sortK==="topic"?topicName(a.topics[0]):a[sortK];
+    let vb=sortK==="topic"?topicName(b.topics[0]):b[sortK];
+    if(typeof va==="number"&&typeof vb==="number")return (va-vb)*sortD;
+    return String(va).localeCompare(String(vb),"zh")*sortD;
+  });
+  rows.forEach(p=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML="<td><b>"+p.cn+"</b><br><span style='color:#9ca3af;font-size:11px'>"+p.title+"</span></td>"+
+      "<td style='white-space:nowrap'>"+p.year+"</td>"+
+      "<td><span class='tag' style='background:"+TOPICS[p.topics[0]].color+"'>"+p.topics[0]+"</span></td>"+
+      "<td>"+p.prop+"</td><td>"+p.res+"</td>"+
+      "<td style='white-space:nowrap'>"+p.persp.map(k=>PERSP[k]).join("、")+"</td>";
+    tr.style.cursor="pointer";
+    tr.onclick=()=>{select(p.id);document.getElementById("sec-graph").scrollIntoView({behavior:"smooth"});};
+    tb.appendChild(tr);
+  });
+}
+renderTable();
+
+/* ============ 搜索 ============ */
+let qTimer=null;
+document.getElementById("q").addEventListener("input",e=>{
+  clearTimeout(qTimer);
+  qTimer=setTimeout(()=>{
+    const q=e.target.value.trim();
+    if(!q){applyDim(()=>true);return;}
+    const ids=new Set(PAPERS.filter(p=>matchQ(p,q)).map(p=>p.id));
+    applyDim(id=>ids.has(id));
+  },180);
+});
+document.getElementById("qclear").onclick=()=>{
+  document.getElementById("q").value="";applyDim(()=>true);
+};
+</script>
+</body>
+</html>
